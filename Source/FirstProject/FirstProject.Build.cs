@@ -8,7 +8,16 @@ public class FirstProject : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+		PublicDependencyModuleNames.AddRange(new string[] //프로젝트에서 사용하는 모듈의 의존성 설정
+		{ 
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"HTTP",
+			"Json",
+            "JsonUtilities"
+        });  
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
