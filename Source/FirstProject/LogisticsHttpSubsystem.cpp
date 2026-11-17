@@ -37,12 +37,54 @@ void ULogisticsHttpSubsystem::SendParcelCreated(int32 ParcelId, FString Destinat
 		{
 			if (bWasSuccessful && HttpResponse.IsValid())
 			{
-				UE_LOG(LogTemp, Warning, TEXT("HTTP Status: %d"),
+				UE_LOG(LogTemp, Warning, TEXT("[Parcel] HTTP Status: %d"),
 					HttpResponse->GetResponseCode());
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("HTTP Request Failed"));
+				UE_LOG(LogTemp, Error, TEXT("[Parcel] HTTP Request Failed"));
+			}
+		}
+	);
+
+
+	Request->ProcessRequest();  //드디어!! HTTP 요청 시작!! 단 서버 응답 확인은 또 따로 적성해야 됨ㅋ + 블루프린트에서 연결하지 않았으니 요청도 안됨
+}
+
+void ULogisticsHttpSubsystem::SendParcelEvent(int32 ParcelId, FString EventType, FString Destination)
+{
+	//이 함수가 호출될때마다 새로운 Http 객체가 생성이되고, 그 객체를 Request라는 이름의 스마트 포인터를 통해 참조하여 실행. 즉 택배의 갯수에 따라 함수가 호출되고 그럴때마다 새로운 객체 생성.
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request =   //생성된 객체를 관리할 스마트 포인터의 자료형
+		FHttpModule::Get().CreateRequest();  //unreal의 Http모듈에 접근해서 새로운 Http 요청 객체를 생성. 이 객체를 사용하여 앞으로 서버주소, HTTP메서드, Json 데이터 등을 설정.
+
+	Request->SetURL("http://localhost:5141/api/ParcelEvent");  //Http 요청을 보낼 서버 주소
+	Request->SetVerb("POST");  //메서드 지정
+	Request->SetHeader("Content-Type", "application/json");  //Http 요청의 추가 정보 설정 => Content-Type은 헤더의 한 영역으로 요청 본문에 담긴 데이터 형식이 JSON이라는 사실 전달.
+
+	TSharedPtr<FJsonObject> JsonObject = MakeShared<FJsonObject>();  //TSharedRef와 비슷한 스마트 포인터. 다만 null값을 허용함. 객체가 없을 수도 있는 경우 사용.
+
+	JsonObject->SetNumberField("parcelId", ParcelId);  //만든 JSON객체에 ParcelID와 목적지 기입.
+	JsonObject->SetStringField("eventType", EventType);
+	JsonObject->SetStringField("destination", Destination);  //다만 아직 Json 문자열로 직렬화한 것이 아닌, 메모리에 객체를 구상한 정도.
+	//지금의 과정은 JSON 객체 메모리에 구상 -> 구상된 데이터로 다시 JSON데이터 생성이라는 다소 번거로운 과정을 거치고 있다. 바로 JSON 데이터를 만들면 될 것을 왜 굳이 이렇게 할까?
+	//데이터를 만드는 과정에 있어서 위의 과정을 직렬화라고 하는데 직렬화 과정을 거치면서 복잡한 데이터나 잘못된 데이터를 일차적으로 수정할 수 있기 때문이다.
+
+	FString JsonString;  //직렬화 결과를 저장할 문자열
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonString);  //Json텍스트를 작성할 Writer생성
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);  //Json객체를 문자열로 직렬화
+	Request->SetContentAsString(JsonString);  //생성한 문자열을 HTTP 요청 본문에 설정
+
+	Request->OnProcessRequestComplete().BindLambda(  //HTTP요청이 완료되면 실행할 람다함수 = 콜백함수.
+		[](FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bWasSuccessful)  //콜백의 매개변수, 요청과 응답 그리고 결과를 bool값으로 받음
+		{
+			if (bWasSuccessful && HttpResponse.IsValid())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[ParcelEvent] HTTP Status: %d"),
+					HttpResponse->GetResponseCode());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[ParcelEvent] HTTP Request Failed"));
 			}
 		}
 	);
