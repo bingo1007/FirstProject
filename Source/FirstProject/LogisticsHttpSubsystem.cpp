@@ -92,3 +92,67 @@ void ULogisticsHttpSubsystem::SendParcelEvent(int32 ParcelId, FString EventType,
 
 	Request->ProcessRequest();  //드디어!! HTTP 요청 시작!! 단 서버 응답 확인은 또 따로 적성해야 됨ㅋ + 블루프린트에서 연결하지 않았으니 요청도 안됨
 }
+
+void ULogisticsHttpSubsystem::GetStatistics()
+{
+	//이 함수가 호출될때마다 새로운 Http 객체가 생성이되고, 그 객체를 Request라는 이름의 스마트 포인터를 통해 참조하여 실행.
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request =   //생성된 객체를 관리할 스마트 포인터의 자료형
+		FHttpModule::Get().CreateRequest();  //unreal의 Http모듈에 접근해서 새로운 Http 요청 객체를 생성. 이 객체를 사용하여 앞으로 서버주소, HTTP메서드, Json 데이터 등을 설정.
+
+	Request->SetURL("http://localhost:5141/api/Statistics");  //Http 요청을 보낼 서버 주소
+	Request->SetVerb("GET");  //메서드 지정
+
+	Request->OnProcessRequestComplete().BindLambda(  //HTTP요청이 완료되면 실행할 람다함수 = 콜백함수.
+		[](FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bWasSuccessful)  //콜백의 매개변수, 요청과 응답 그리고 결과를 bool값으로 받음
+		{
+			if (bWasSuccessful && HttpResponse.IsValid())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Statistics] HTTP Status : %d"),
+					HttpResponse->GetResponseCode());
+
+				if (HttpResponse->GetResponseCode() == 200)
+				{
+					FString ResponseString = HttpResponse->GetContentAsString();  //HTTP 응답 본문을 string형태로 가져오는 함수. 즉 ResponseString에는 
+					UE_LOG(LogTemp, Warning, TEXT("[Statistics] Response : %s"),
+						*ResponseString);
+
+					//역직렬화 과정. 언리얼 -> 서버로 POST를 실행할 땐 데이터를 JSON파일로 변환하는 직렬화를 거쳤는데 지금은 반대의 상황이니 JSON을 언리얼 변수로 만드는 역직렬화 과정 필요.
+					TSharedPtr<FJsonObject> JsonObject;  //JSON 객체를 참조할 스마트 포인터
+
+					TSharedRef<TJsonReader<>> Reader =  //문자열을 읽을 JSON Reader 생성
+						TJsonReaderFactory<>::Create(ResponseString);
+
+					if (FJsonSerializer::Deserialize(Reader, JsonObject)  //JSON 문자열을 객체로 변환
+						&& JsonObject.IsValid())  //변환된 객체가 유효한지 확인
+					{
+						//지정한 키에 해당하는 정수 값 추출.
+						int32 TotalParcels =  //총 처리량
+							JsonObject->GetIntegerField(TEXT("totalParcels")); 
+
+						int32 ScannedEvents =  //SCANNED 처리량
+							JsonObject->GetIntegerField(TEXT("scannedEvents"));
+
+						int32 SortedEvents =  //SORTED 처리량
+							JsonObject->GetIntegerField(TEXT("sortedEvents"));
+
+						UE_LOG(LogTemp, Warning,
+							TEXT("[Statistics] Total: %d, Scanned: %d, Sorted: %d"),
+							TotalParcels, ScannedEvents, SortedEvents);
+					}
+					else
+					{
+						UE_LOG(LogTemp, Error,
+							TEXT("[Statistics] JSON Deserialization Failed"));
+					}
+				}
+				
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[Statistics] Statistics Request Failed"));
+			}
+		}
+	);
+
+	Request->ProcessRequest();  //드디어!! HTTP 요청 시작!! 단 서버 응답 확인은 또 따로 적성해야 됨ㅋ + 블루프린트에서 연결하지 않았으니 요청도 안됨
+}

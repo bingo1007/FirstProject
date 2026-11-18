@@ -22,5 +22,18 @@ public:
 	//이벤트 발생시 객체 생성 및 추가 함수
 	UFUNCTION(BlueprintCallable, Category = "Logistics|HTTP")  
 	void SendParcelEvent(int32 ParcelId, FString EventType, FString Destination);
-	
+
+	//STATISTICS 요청 함수
+	UFUNCTION(BlueprintCallable, Category = "Logistics|HTTP")
+	void GetStatistics();
+
+	//Statistics 받아오면 저장할 변수들, 이거 하면 블프에서도 사용 가능. 즉 이것들은 서브 시스템의 변수들임.
+	UPROPERTY(BlueprintReadOnly, Category = "Logistics|Statistics")
+	int32 TotalParcels = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Logistics|Statistics")
+	int32 ScannedEvents = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Logistics|Statistics")
+	int32 SortedEvents = 0;
 };
